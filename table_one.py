@@ -224,67 +224,56 @@ def clean_data(df_temp, experiment, feats_use=list()):
 
 import pandas as pd
 import numpy as np
-import xlwt
 
 
-#time_hours = np.inf
-time_hours = 72
 
-df = pd.read_csv(r"\\\amc.intra\users\L\laramos\home\Desktop\Postdoc eHealth\feature_datasets\Alcohol"+str(time_hours)+".csv")
 
-X, y  = clean_data(df,'exp2')
+def table_one(X,y,args,time_hours):
 
-X['Phase'] = y
-
-df = X
-
-book = xlwt.Workbook(encoding="utf-8")    
-sheet1 = book.add_sheet("Sheet 1")
-
-#n_part = df.shape[0]
-df_phase1 = df[df.Phase==0]
-n_phase1 = df_phase1.shape[0]
-
-df_other = df[df.Phase==1]
-n_other = df_other.shape[0]
-
-bin_cols = [ 'Start video', 'Afspraken maken', 'Voor- en nadelen', 'Jouw afspraken']
-       
-feature_names = df.columns
-
-init_feat = [c for c in feature_names if 'Initial' in c]
-targ_feat = [c for c in feature_names if 'Target' in c]
-feats = init_feat + targ_feat
+    X['Phase'] = y
     
-cont_cols = [ 'Pros Short', 'Pros Long', 'Cons Short', 'Cons Long', 'Number of Agreements', 'Total Agreement Length'] + feats
- 
-cat_cols = ['GoalOfProgram']
+    df = X
     
-for i,col in enumerate(cont_cols):    
-    sheet1.write(i+1,0,col)    
+    book = xlwt.Workbook(encoding="utf-8")    
+    sheet1 = book.add_sheet("Sheet 1")
+    
+    #n_part = df.shape[0]
+    df_phase1 = df[df.Phase==0]
+    n_phase1 = df_phase1.shape[0]
+    
+    df_other = df[df.Phase==1]
+    n_other = df_other.shape[0]
 
-for col in (bin_cols):
-    i = i+1
-    sheet1.write(i+1,0,col)  
-    
-for col in (cat_cols):
-    i = i+1
-    sheet1.write(i+1,0,col)      
-    
-sheet1.write(0,1,"Alcohol Phase 1")         
-sheet1.write(0,2,"Alcohol Other Phases")
-    
-for i,col in enumerate(cont_cols):
-    sheet1.write(i+1,1,str("%0.0f (%0.2f)"%(np.mean(df_phase1[col]),np.std(df_phase1[col]))))         
-    sheet1.write(i+1,2,str("%0.0f (%0.2f)"%(np.mean(df_other[col]),np.std(df_other[col]))))
-    
-for col in (bin_cols):
-    i = i + 1
-    sheet1.write(i+1,1,str("%0.0f (%0.2f)"%(np.sum(df_phase1[col]),((np.sum(df_phase1[col])*100)/n_phase1))))
-    sheet1.write(i+1,2,str("%0.0f (%0.2f)"%(np.sum(df_other[col]),((np.sum(df_other[col])*100)/n_other))))
-    #sheet1.write(i+1,2,str("%0.0f (%0.2f)"%(np.mean(df_other[col]),np.std(df_other[col]))))    
+    cont_cols = args['mask_cont']
+    cat_cols = args['mask_cat']
+    bin_cols = args['mask_bin']
 
-book.save(r"\\amc.intra\users\L\laramos\home\Desktop\Postdoc eHealth\Alcohol"+str(time_hours)+"_Descriptive.xls")  
+    
+    for i,col in enumerate(cont_cols):    
+        sheet1.write(i+1,0,col)    
+
+    for col in (bin_cols):
+        i = i+1
+        sheet1.write(i+1,0,col)  
+    
+    for col in (cat_cols):
+        i = i+1
+        sheet1.write(i+1,0,col)      
+        
+    sheet1.write(0,1,"Alcohol Phase 1")         
+    sheet1.write(0,2,"Alcohol Other Phases")
+        
+    for i,col in enumerate(cont_cols):
+        sheet1.write(i+1,1,str("%0.0f (%0.2f)"%(np.mean(df_phase1[col]),np.std(df_phase1[col]))))         
+        sheet1.write(i+1,2,str("%0.0f (%0.2f)"%(np.mean(df_other[col]),np.std(df_other[col]))))
+        
+    for col in (bin_cols):
+        i = i + 1
+        sheet1.write(i+1,1,str("%0.0f (%0.2f)"%(np.sum(df_phase1[col]),((np.sum(df_phase1[col])*100)/n_phase1))))
+        sheet1.write(i+1,2,str("%0.0f (%0.2f)"%(np.sum(df_other[col]),((np.sum(df_other[col])*100)/n_other))))
+        #sheet1.write(i+1,2,str("%0.0f (%0.2f)"%(np.mean(df_other[col]),np.std(df_other[col]))))    
+    
+    book.save(r"\\amc.intra\users\L\laramos\home\Desktop\Postdoc eHealth\Alcohol"+str(time_hours)+"_Descriptive.xls")  
 
 
 df2 = df[df['Voor- en nadelen']==0]

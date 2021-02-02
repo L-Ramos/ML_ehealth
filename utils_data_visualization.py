@@ -24,6 +24,7 @@ def fix_frames(df_program, df_participator,df_phasestart, df_events, df_forumpos
     df_program['Finished'] = df_program['Finished']*-1
     df_program['IsActive'] = df_program['IsActive']*-1
     df_program['Activated'] = df_program['Activated']*-1
+    df_program['Participator'] = df_program['Participator'].fillna(-1).astype('int64')
     
     df_participator['IsAvailableForResearch'] = df_participator['IsAvailableForResearch']*-1
     
@@ -34,6 +35,7 @@ def fix_frames(df_program, df_participator,df_phasestart, df_events, df_forumpos
     
     df_forumpost['Author'] = df_forumpost['Author'].astype('int64')
     df_forumpost['DateCreated'] = pd.to_datetime(df_forumpost['DateCreated'])
+    
                
     return(df_program, df_participator, df_phasestart, df_events, df_forumpost)
 
@@ -130,8 +132,6 @@ def filter_time_tables(time_hours,df_filter,df_frame, type_frame, name_date):
     #function usef to filter assignments done within a certain time after start
     df_temp = df_filter[['Id','StartDateOfParticipation','GoalOfProgram', 'Participator']]
     df_temp['Id'] = df_temp['Id'].astype('int64')
-    df_temp['Participator'] = df_temp['Participator'].astype('int64')
-    
     
     if type_frame=='assignment':       
         df = pd.merge(df_frame, df_temp, left_on= 'Participation', right_on ='Id', how='left')

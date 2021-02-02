@@ -19,9 +19,9 @@ args = dict()
 args['random_state'] = 1         
 args['undersample'] = 'B'
 args['n_jobs'] = -2
-args['outter_splits'] = 3
+args['outter_splits'] = 10
 args['verbose'] = 1
-args['n_iter_search'] = 1
+args['n_iter_search'] = 25
 args['opt_measure'] = 'roc_auc'
 args['cv_plits'] = 3
 args['class_weight'] = 'balanced'
@@ -33,9 +33,10 @@ PATH_DATA = r"\\amc.intra\users\L\laramos\home\Desktop\Postdoc eHealth\feature_d
 # feature_type_list = ['safe','all']
 
 time_hours_list = [72]
-program_list = ['Alcohol']
+program_list = ['Alcohol','Cannabis', 'Smoking']
 feature_type_list = ['safe']
-experiment = 'exp2'
+experiment = 'exp1'
+drop_afspraak = False
 
 for program in program_list:
     for time_hours in time_hours_list:
@@ -51,7 +52,9 @@ for program in program_list:
             
             args, feats_use  = dt.get_features(args, feature_type,df_temp.columns,var_list)
             
-            X, y  = dt.clean_data(df_temp,args,experiment,feats_use)
+            X, y  = dt.clean_data(df_temp,args,experiment,drop_afspraak,feats_use)
+            
+            dt.table_one(path_write,X,y,args,time_hours)
             
             kf = KFold(n_splits = args['outter_splits'], random_state=1, shuffle=True)
             
