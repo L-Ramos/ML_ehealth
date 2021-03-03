@@ -28,7 +28,7 @@ df_participator = uts.load_data(PATH_DATA,"Participator.xls")
 
 df_program = uts.load_data(PATH_DATA,"ProgramParticipation.xls") 
 
-df_reg = uts.load_data(PATH_DATA,"ConsumptionRegistration.xls") 
+df_cons = uts.load_data(PATH_DATA,"ConsumptionRegistration.xls") 
 df_day = uts.load_data(PATH_DATA,"ConsumptionDay.xls") 
 
 df_phasestart = uts.load_data(PATH_DATA,"PhaseStart.xls") 
@@ -42,11 +42,21 @@ df_challenge = uts.load_data(PATH_DATA, "ChallengeAssignment.xls")
 df_forumpost = uts.load_data(PATH_DATA,"ForumPost.xls")
 df_forumthread = uts.load_data(PATH_DATA,"ForumThread.xls")
 
+df_thread = uts.load_data(PATH_DATA,"ThreadViewing.xls")
+
 df_pcusing = uts.load_data(PATH_DATA, "AssignmentAnswerProsConsUsing.csv")
 
 df_assign_answer = uts.load_data(PATH_DATA, "AssignmentAnswerAgreements.csv")
 
-df_program, df_participator, df_phasestart, df_events, df_forumpost = uts.fix_frames(df_program, df_participator, df_phasestart, df_events, df_forumpost)
+df_partbadge = uts.load_data(PATH_DATA,"ParticipationBadge.xls")
+
+#events did not work, no matchs with the data
+#df_partevents = uts.load_data(PATH_DATA,"ParticipationEvents.xls")
+
+df_achievelike = uts.load_data(PATH_DATA,"AchievementLike.xls")
+
+df_program, df_participator, df_phasestart, df_events, df_forumpost, df_forumthread, df_thread = uts.fix_frames(df_program, df_participator, df_phasestart, df_events, df_forumpost,
+                                                                                     df_forumthread, df_thread)
 
 print("Data Loaded")
 
@@ -60,10 +70,12 @@ df_events = df_events.dropna(subset=['EventGenerator'])
 
 df_participator = uts.filter_date(df_participator,'DateCreated')
 df_program = uts.filter_date(df_program,'StartDateOfParticipation')
-df_reg = uts.filter_date(df_reg,'DateOfRegistration')
+df_cons = uts.filter_date(df_cons,'DateOfRegistration')
 df_phasestart = uts.filter_date(df_phasestart,'DateStarted')
 df_events = uts.filter_date(df_events,'DateOfEvent')
 df_forumpost = uts.filter_date(df_forumpost,'DateCreated')
+df_forumthread = uts.filter_date(df_forumthread,'DateCreated')
+df_thread = uts.filter_date(df_thread, 'Date')
 
 print('Tables filtered by Date.')
 
@@ -75,11 +87,8 @@ df_merge = df_program
 df_merge_part = pd.merge(df_participator,df_merge,left_on='Id',right_on='Participator')
 print(df_participator.shape[0],df_merge_part.shape[0])
 
-df_merge_reg = pd.merge(df_reg,df_merge,left_on='Participation',right_on='Id')
-print(df_reg.shape[0],df_merge_reg.shape[0])
-
-df_merge_cons = pd.merge(df_day,df_merge,left_on='Participation',right_on='Id')
-print(df_day.shape[0],df_merge_cons.shape[0])
+df_merge_cons = pd.merge(df_cons,df_merge,left_on='Participation',right_on='Id')
+print(df_cons.shape[0],df_merge_cons.shape[0])
 
 # df_merge_events = pd.merge(df_events,df_merge,left_on='EventGenerator',right_on='Id',how='inner')
 # print(df_events.shape[0],df_merge_events.shape[0])
@@ -93,61 +102,142 @@ print(df_assign.shape[0],df_merge_challenge.shape[0])
 df_merge_forumpost = uts.merge_multactivity_program(df_forumpost,df_program,'DateCreated','StartDateOfParticipation','Author','Participator')
 print(df_forumpost.shape[0],df_merge_forumpost.shape[0])
 
+df_merge_forumthread = uts.merge_multactivity_program(df_forumthread,df_program,'DateCreated','StartDateOfParticipation','Author','Participator')
+print(df_forumthread.shape[0],df_merge_forumthread.shape[0])
+
 #df_merge_risk = pd.merge(df_assign,df_assign_risk,left_on='Assignment',right_on='Id',how='inner')
 print("Tables merged.")
 #%% Selecting assigments only from Participants from PROGRAM Phase 1 and > 2
 
-#df_merge_challenge  = df_merge_challenge.drop(['Id_x'])
-#I dont have to filter by phase 1 and 2, becayse people at phase 3 also did phase 2
-#phases = [1,2]
 
 program_dict = {1: 'Alcohol',2: 'Cannabis', 5: 'Smoking'}
 pros_cons_dic = {3:'Pros Short', 4: 'Pros Long', 5: 'Cons Short', 6: 'Cons Long'} 
 
+TIME_HOURS_LIST = [72,96,120]
 
-TIME_HOURS = 72
-
-remove_after_phase1 = False
+number_of_days_cons = 7
 
 for PROGRAM in program_dict.keys():
+    for TIME_HOURS in TIME_HOURS_LIST:
  
-    df_merge_challenge_feat, df_filter = uts.select_participants_from_phase(df_program, PROGRAM, df_merge_challenge,df_phasestart)
-    
-    if remove_after_phase1:
-        df_merge_challenge_feat,df_filter = uts.filter_assigment_ids_after_phase(['Voor- en nadelen','Jouw afspraken'],df_merge_challenge_feat,
-                                                                                 df_phasestart,df_filter)
-       
-    #filtering by time
-    df_merge_challenge_feat = uts.filter_time_tables(TIME_HOURS, df_filter, df_merge_challenge_feat,'assignment','DateCompletedUtc')
-    
-    #Feature engineering for pros and cons
-    df_merge_feats = uts.feature_engineering_pros_cons(df_filter,df_pcusing,pros_cons_dic)
+        df_merge_challenge_feat, df_filter = uts.select_participants_from_phase(df_program, PROGRAM, df_merge_challenge, df_phasestart)
+               
+        #filtering by time
+        df_merge_challenge_feat = uts.filter_time_tables(TIME_HOURS, df_filter, df_merge_challenge_feat,'assignment','DateCompletedUtc')
         
-    #Feature engineering for binary features
-    df_merge_feats = uts.feature_engineering_binary(df_merge_challenge_feat,df_filter,df_program,df_merge_feats)
-    
-    #Feature engineering for time from start to assignment completion
-    df_merge_feats = uts.feature_engineering_time_assigment(df_merge_challenge_feat,df_merge_feats,df_program,'DateRegistered','DateCompletedUtc')
+        #Feature engineering for pros and cons
+        df_merge_feats = uts.feature_engineering_pros_cons(df_filter,df_pcusing,pros_cons_dic)
+            
+        #Feature engineering for binary features
+        df_merge_feats = uts.feature_engineering_binary(df_merge_challenge_feat,df_filter,df_program,df_merge_feats)
         
-    #Feature Engineering for AssignmentAnswerAgreements (length of reply / number of replies)
-    df_merge_feats = uts.feature_engineering_assignment_agreement(df_filter,df_merge_feats,df_assign_answer,pros_cons_dic)
-    
-    # Feature engineering from consumption target and goal
-    df_merge_feats = uts.feature_engineering_consumption_features(df_day,df_merge_feats)
-       
-    #Feature engineering for Forum and Login Events
-    df_merge_feats = uts.feature_engineering_forum_and_login_events(TIME_HOURS,df_filter,df_merge_feats,df_events)
-    
-    #Forum Post FEature engineering
-    df_merge_feats = uts.feature_engineering_forumpost(TIME_HOURS,df_filter,df_forumpost,df_merge_feats,'DateCreated')
-    
-    uts.save_frame(df_merge_feats,os.path.join(PATH_SAVE,program_dict[PROGRAM]+str(TIME_HOURS)+str(remove_after_phase1)+'.csv'))
-    
+        #Feature engineering for time from start to assignment completion
+        #df_merge_feats = uts.feature_engineering_time_assigment(df_merge_challenge_feat,df_merge_feats,df_program,'DateRegistered','DateCompletedUtc')
+            
+        #Feature Engineering for AssignmentAnswerAgreements (length of reply / number of replies)
+        df_merge_feats = uts.feature_engineering_assignment_agreement(df_filter,df_merge_feats,df_assign_answer,pros_cons_dic)
+        
+        # Feature engineering from consumption target and goal
+        df_merge_feats = uts.feature_engineering_consumption_features(df_day,df_merge_feats)
+           
+        #Feature engineering for Forum and Login Events
+        df_merge_feats = uts.feature_engineering_forum_and_login_events(TIME_HOURS,df_filter,df_merge_feats,df_events)
+        
+        #Forum Post FEature engineering
+        df_merge_feats = uts.feature_engineering_forumpost(TIME_HOURS,df_filter,df_forumpost,df_merge_feats,'DateCreated','Number of ForumPosts')
+        
+        df_merge_feats = uts.feature_engineering_forumpost(TIME_HOURS,df_filter,df_forumthread,df_merge_feats,'DateCreated','Number of ThreadPosts')
+        
+        #removing the particpants that access assignement multiple times
+        #df_merge_feats = uts.remove_ids_future_edits(df_merge_challenge,df_filter,df_merge_feats,TIME_HOURS)
+        
+        df_merge_feats = uts.add_consumption_before_last_phase(number_of_days_cons,df_cons,df_phasestart, df_merge_feats)
+        
+        df_merge_feats = uts.feature_engineering_consumption_first_days(time_hours, df_cons, df_filter,df_merge_feats)
+        
+        df_merge_feats = uts.feature_engineering_thread_vieweing(TIME_HOURS,df_thread,df_filter,df_merge_feats)
+        
+        df_merge_feats = uts.feature_engineering_badge(TIME_HOURS,df_filter,df_partbadge,df_merge_feats)
+        
+        df_merge_feats = uts.feature_engineering_achievementlike(TIME_HOURS,df_filter,df_achievelike,df_merge_feats)
+        
+        #Saves it as a .csv file
+        uts.save_frame(df_merge_feats,os.path.join(PATH_SAVE,program_dict[PROGRAM]+str(TIME_HOURS)+'.csv'))
+        print("saved")
+
+
+# df_temp = pd.merge(df,df_phase_filter_temp, on='Participation',how='left')
+
+# df = df_temp[df_temp.DateStarted.notna()]
+
+
+#%%
+
+print((203*100)/9709)
+
+
+#%%This is for df_achievelike
+
+df_initial = uts.compute_target_consumption_features(df_day,'Initial')
+df_target = uts.compute_target_consumption_features(df_day,'Target')
+
+df = pd.merge(df_filter, df_target, left_on='Id',right_on= 'Participation', how='left')
+
+df = df[df['GoalOfProgram']==1]
+
+df = df[df['Participation'].isna()]
+
+
+#%% Getting the succesfull ones
 
     
+    X1 = df_temp[df_temp['Phase']==2]
+    X2 = df_temp[df_temp['Phase']==6]
+    
+    frames = [X1,X2]
+    X = pd.concat(frames)
+    y = (X['Phase']>2).astype('int32').reset_index(drop=True)
+    y = ((X['Phase']>2) & (X['Total_achieved']==7))
+    X = X[feats_use] 
+    
+   
+    
+
+#df = df_temp[df_temp['Total_achieved']==7]
+
+#How many actually have complete data
+for i in range(7,-1,-1):
+    print("%d (%0.2f)"%(sum(df_temp['Total_achieved']==i),(sum(df_temp['Total_achieved']==i)*100)/df_temp.shape[0]))
+    
+
+print("\n")    
+#How many were succesfull
+for i in range(7,-1,-1):    
+    df_temp['Success'] = df_temp[list_goal].sum(axis=1)==i
+    df_succ = df_temp[df_temp['Success']==True]    
+    print("%d (%0.2f)"%(sum(df_temp['Success']),sum((df_temp['Success'])*100)/df_temp.shape[0]))
 
 
-#%% checking the particpants that access assignement mulktiple times
+print("\n") 
+#Now the distribution of phases of these participants
+df_temp['Success'] = df_temp[list_goal].sum(axis=1)==7
+
+df = df_temp[df_temp['Success']]
+
+for i in range(6,0,-1):
+    print("%d (%0.2f)"%(sum(df['Phase']==i),(sum(df['Phase']==i)*100)/df.shape[0]))
+
+
+#%%#Feature engineering for df_partevents, but it does not work
+
+df_partevents['Participation'] = df_partevents['Participation'].astype('int64')
+
+df = pd.merge(df_partevents, df_filter, left_on= 'Participation', right_on ='Id', how='left')
+
+df = df[~df.Id_y.isna()]
+
+df_temp = uts.filter_time_tables(500000, df_filter, df_partevents,'assignment','DateOfEvent')
+
 
 
 #%% This is for filtering phase first and so forth, smarter and more maintanable
@@ -166,7 +256,13 @@ df = uts.filter_phase(df_forumpost,'forum', df_phasestart,'Author','Participator
 
 
 #%% Plotting some events from a participant using only the events table
+remove_after_phase1 = False
 
+if remove_after_phase1:
+    df_merge_challenge_feat,df_filter = uts.filter_assigment_ids_after_phase(['Voor- en nadelen','Jouw afspraken'],df_merge_challenge_feat,
+                                                                             df_phasestart,df_filter)
+        
+        
 counts = df_events.EventGenerator.value_counts()
 
 
@@ -211,7 +307,7 @@ df_s = df_program[df_program.Participator==ids]
 part_id = df_s.Id.iloc[0]
 #part_id = ids
 
-df_reg_s = df_reg[df_reg.Participation==part_id]
+df_reg_cons = df_cons[df_cons.Participation==part_id]
 df_crav_s = df_crav[df_crav.ProgramParticipation==part_id]
 
 df_plot_reg = pd.DataFrame(columns=['Date','Units'])
@@ -222,7 +318,7 @@ if df_crav_s.shape[0]!=0:
     df_plot_reg['Units'] = df_crav_s['NumberOfUnitsConsumed']
     
 else:
-    df_reg_s['DateOfRegistration'] = pd.to_datetime(df_reg_s['DateOfRegistration'])
+    df_reg_cons['DateOfRegistration'] = pd.to_datetime(df_reg_s['DateOfRegistration'])
     df_plot_reg['Date'] = df_reg_s['DateOfRegistration'].dt.date
     df_plot_reg['Units'] = df_reg_s['NumberOfUnitsConsumed']
 
@@ -265,9 +361,9 @@ df_merge.Id.nunique()
 
 
 #checking the overlap
-set_events = set(df_events.EventGenerator)
-set_prog_id = set(df_program.Id)
-set_prog_part = set(df_program.Participator)
+set_events = set(df_partevents.Participation)
+set_prog_id = set(df_filter.Id)
+
 
 int1 = set_events.intersection(set_prog_id)
 int2 = set_events.intersection(set_prog_part)
@@ -415,3 +511,5 @@ cmap = sns.diverging_palette(250, 10, as_cmap=True)
 # Draw the heatmap with the mask and correct aspect ratio
 sns.heatmap(corr, mask=mask, cmap=cmap, vmax=1.0, center=0,
             square=True, linewidths=.5, cbar_kws={"shrink": .5},annot = True,fmt='.1g')
+
+

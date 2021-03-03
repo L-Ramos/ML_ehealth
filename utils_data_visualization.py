@@ -6,6 +6,7 @@ Created on Wed Jan 13 10:42:24 2021
 """
 import os
 import pandas as pd
+from datetime import timedelta
 
 
 def load_data(path_data,file_name):
@@ -18,7 +19,7 @@ def load_data(path_data,file_name):
             
     return(df)
 
-def fix_frames(df_program, df_participator,df_phasestart, df_events, df_forumpost):
+def fix_frames(df_program, df_participator,df_phasestart, df_events, df_forumpost, df_forumthread, df_thread):
     
     df_program['StartDateOfParticipation'] = pd.to_datetime(df_program['StartDateOfParticipation'])
     df_program['Finished'] = df_program['Finished']*-1
@@ -36,8 +37,13 @@ def fix_frames(df_program, df_participator,df_phasestart, df_events, df_forumpos
     df_forumpost['Author'] = df_forumpost['Author'].astype('int64')
     df_forumpost['DateCreated'] = pd.to_datetime(df_forumpost['DateCreated'])
     
-               
-    return(df_program, df_participator, df_phasestart, df_events, df_forumpost)
+    df_forumthread['Author'] = df_forumthread['Author'].astype('int64')
+    df_forumthread['DateCreated'] = pd.to_datetime(df_forumthread['DateCreated'])
+    
+    df_thread['Participator'] = df_thread['Participator'].astype('int64')
+    df_thread['Date'] = pd.to_datetime(df_thread['Date'])    
+                   
+    return(df_program, df_participator, df_phasestart, df_events, df_forumpost,df_forumthread,df_thread)
 
 def filter_date(df,date_column,date_to_filter='2016-01-01'):
     df_filter = df[(df[date_column] > date_to_filter)]
@@ -65,8 +71,11 @@ def merge_multactivity_program(df_activity,df_program, leftdate_on, rightdate_on
     df_activity = df_activity.sort_values(by=[leftdate_on])
     df_program = df_program.sort_values(by=[rightdate_on])
     
-    df_program['Participator'] = df_program['Participator'].fillna(-1)
-    df_program['Participator'] = df_program['Participator'].astype('int64')
+    df_program[right_by] = df_program[right_by].fillna(-1)
+    df_program[right_by] = df_program[right_by].astype('int64')
+    
+    df_activity[left_by] = df_activity[left_by].fillna(-1)
+    df_activity[left_by] = df_activity[left_by].astype('int64')
     
     df_merge_ = pd.merge_asof(df_activity, df_program, left_on=leftdate_on, right_on = rightdate_on, left_by=left_by, 
                                        right_by = right_by)
@@ -111,10 +120,16 @@ def bin_feat_eng_phase1(df_merge_challenge,df_filter,df_program,df_merge_feats,f
     df_startvideo['DateCompletedUtc'] = pd.to_datetime(df_startvideo['DateCompletedUtc'])
     
     df_merge_startvideo = merge_multactivity_program(df_startvideo,df_program,'DateCompletedUtc','StartDateOfParticipation','Participation','Id')
-    df_merge_startvideo = df_merge_startvideo.drop_duplicates(subset=['Id','StartDateOfParticipation'])
+    #df_merge_startvideo = df_merge_startvideo.drop_duplicates(subset=['Id','StartDateOfParticipation'])
     
     df_merge_startvideo[feat_name] = (df_merge_startvideo.Name==feat_name).astype('int32')
     df_merge_startvideo = df_merge_startvideo[['Id',feat_name]]
+    
+    df_temp  = df_merge_startvideo.groupby(['Id']).agg({feat_name:['sum']})#.unstack()
+    df_merge_startvideo = pd.DataFrame(columns = ['Id',feat_name])
+    df_merge_startvideo['Id'] = df_temp.index
+    df_merge_startvideo[feat_name] = df_temp.values
+    
     
     df_temp = pd.merge(df_merge_feats,df_merge_startvideo,left_on = 'Id', right_on='Id',how = 'left')
     
@@ -139,8 +154,10 @@ def filter_time_tables(time_hours,df_filter,df_frame, type_frame, name_date):
         df = merge_multactivity_program(df_frame,df_temp,name_date,'StartDateOfParticipation','Author','Participator')       
         df = df[df.Participator.notna()]   
     elif type_frame=='events': 
-            df_frame['EventGenerator'] = df_frame['EventGenerator'].astype('int64')           
-            df = merge_multactivity_program(df_frame,df_temp,name_date,'StartDateOfParticipation','EventGenerator','Participator')
+        df_frame['EventGenerator'] = df_frame['EventGenerator'].astype('int64')           
+        df = merge_multactivity_program(df_frame,df_temp,name_date,'StartDateOfParticipation','EventGenerator','Participator')
+    elif type_frame=='thread':        
+        df = merge_multactivity_program(df_frame,df_temp,name_date,'StartDateOfParticipation','Participator','Participator')
             
             #df = pd.merge(df_frame, df_temp, left_on= 'EventGenerator', right_on ='Participator', how='left')
     df[name_date] = pd.to_datetime(df[name_date])
@@ -208,6 +225,7 @@ def select_participants_from_phase(df_program, PROGRAM, df_merge_challenge,df_ph
     df_merge_challenge = df_merge_challenge[df_merge_challenge['Phase']==1]
     
     #here I check the assingments from phase 1 that were finished after the start of phase 2
+    #get phase 2 related information
     df_phase_filter = df_phasestart[df_phasestart.Phase==2]
     df_phase_filter = df_phase_filter.drop(['Id','Phase'],axis=1)
     
@@ -375,15 +393,167 @@ def feature_engineering_forum_and_login_events(TIME_HOURS,df_filter,df_merge_fea
     
     return(df_merge_feats)
 
-def feature_engineering_forumpost(TIME_HOURS,df_filter,df_forumpost,df_merge_feats,time_forum):
+def feature_engineering_forumpost(TIME_HOURS,df_filter,df_forumpost,df_merge_feats,time_forum, var_name):
 
     df_temp = filter_time_tables(TIME_HOURS, df_filter, df_forumpost,'forum','DateCreated')
     #df_temp = uts.filter_time_tables(72, df_filter, df_forumpost,'forum','DateCreated')
     
-    df2 = df_temp.groupby(['Id_y']).size().reset_index(name='Number of ForumPosts')
+    df2 = df_temp.groupby(['Id_y']).size().reset_index(name=var_name)
     df2.Id_y = df2.Id_y.astype('int32')
     
     df_merge_feats = pd.merge(df_merge_feats, df2, left_on = 'Id',right_on = 'Id_y',how = 'left')
     df_merge_feats = df_merge_feats.drop(['Id_y'],axis=1)
 
     return (df_merge_feats)
+
+
+def remove_ids_future_edits(df_merge_challenge,df_filter,df_merge_feats,time_hours):
+    #This function can be used to remove ids from people that go back to assignments and might edit or add things after the time frame we defined
+    #Leaving these participants can include a severe bias
+    
+    #include other variables that might be affected by this here
+    names = ['Voor- en nadelen','Jouw afspraken']
+     
+    df_merge_challenge_feat = df_merge_challenge[df_merge_challenge['Phase']==1]
+    
+    df_temp = df_filter[['Id','StartDateOfParticipation','GoalOfProgram', 'Participator']]
+    df_temp['Id'] = df_temp['Id'].astype('int64')
+    
+    df = pd.merge(df_merge_challenge_feat, df_temp, left_on= 'Participation', right_on ='Id', how='left')
+              
+    df['DateCompletedUtc'] = pd.to_datetime(df['DateCompletedUtc'])
+    df['Diff'] = df['DateCompletedUtc'] - df['StartDateOfParticipation']
+    df = convert_dttime_to_hours(df,'Diff','Total time')
+    
+    df_temp = df[df['Total time']<=time_hours]
+    df_temp = df[df['Total time']>=time_hours]
+    
+
+    df = df_temp[df_temp.Name.isin(names)]
+    
+    ids1 = (set(df.Participation))
+    ids2 = (set(df_merge_feats.Id))
+    
+    inter = list(ids1.intersection(ids2))
+    
+    df = df_merge_feats[~df_merge_feats.Id.isin(inter)]
+    
+    return(df)
+
+def add_consumption_before_last_phase(number_of_days_before, df_cons, df_phasestart,df_merge_feats):
+
+    #We use this variable to get the last 7 days
+    days_subtract = timedelta(days=number_of_days_before)
+
+    df_cons6 = df_cons
+
+    #df_phase6 = df_phasestart[df_phasestart.Phase==6][['Phase', 'DateStarted', 'Participation']]
+    #get the last phase they achieved
+    df_phasegroup = df_phasestart.sort_values('DateStarted').groupby('Participation').tail(1)[['Phase', 'DateStarted', 'Participation']]
+
+    df_phasegroup['date_7days'] = df_phasegroup['DateStarted'] - days_subtract
+
+    df_merge_phasecons = pd.merge(df_cons6,df_phasegroup,on='Participation',how='left')
+    
+    #These participants did not reach further than phase 1
+    df_merge_phasecons = df_merge_phasecons[df_merge_phasecons['date_7days'].notna()]
+
+    df_merge_phasecons['date_7days'] = pd.to_datetime(df_merge_phasecons['date_7days'])
+    df_merge_phasecons['DateOfRegistration'] = pd.to_datetime(df_merge_phasecons['DateOfRegistration'])
+
+    # Here I get the interval between their last phase and 7 days before
+    df_merge_phasecons = df_merge_phasecons[df_merge_phasecons['DateOfRegistration']>df_merge_phasecons['date_7days']]
+    df_merge_phasecons = df_merge_phasecons[df_merge_phasecons['DateOfRegistration']<df_merge_phasecons['DateStarted']]
+
+    df = df_merge_phasecons.copy()
+
+    df['DayOfWeek'] = df['DateOfRegistration'].dt.day_name()
+    #Some participants register 
+    df_temp = df.groupby(['Participation','DayOfWeek']).agg({'NumberOfUnitsConsumed':['sum']}).unstack()
+    df_temp = df_temp.reset_index(level=['Participation'])
+    df_temp = df_temp.droplevel(1,axis=1)
+    df_temp = df_temp.droplevel(0,axis=1)
+    cols = list(df_temp.columns)
+    cols[0] = 'Participation'
+    df_temp = pd.DataFrame(df_temp.values,columns = cols)
+
+    #df_temp = df_temp.dropna(how='any',axis=0)
+    df_temp  = pd.merge(df_merge_feats,df_temp,left_on ='Id',right_on = 'Participation',how='left')
+    df_temp = df_temp.drop('Participation',axis=1)
+    
+    return(df_temp)
+
+
+
+def feature_engineering_thread_vieweing(TIME_HOURS,df_thread,df_filter,df_merge_feats):
+
+    df_temp = df_filter.copy()
+    
+    df_temp = filter_time_tables(TIME_HOURS, df_temp, df_thread,'thread','Date')
+    
+    df_temp = df_temp.groupby(['Id_y']).size().reset_index(name='Number of Thread Views')
+    
+    df_temp  = pd.merge(df_merge_feats,df_temp,left_on ='Id',right_on = 'Id_y',how='left')
+    
+    df_temp = df_temp.drop('Id_y',axis=1)
+    
+    return(df_temp)
+
+
+def feature_engineering_badge(TIME_HOURS,df_filter,df_partbadge,df_merge_feats):
+    
+    df_temp = filter_time_tables(TIME_HOURS, df_filter, df_partbadge,'assignment','DateAssignedUtc')
+    
+    df_temp = df_temp.groupby(['Participation']).size().reset_index(name='Number of Participation Badges')
+    
+    df_temp  = pd.merge(df_merge_feats,df_temp,left_on ='Id',right_on = 'Participation',how='left')
+    
+    df_temp = df_temp.drop('Participation',axis=1)
+
+    return(df_temp)
+
+
+def feature_engineering_achievementlike(TIME_HOURS,df_filter,df_achievelike,df_merge_feats):
+    
+        df_achievelike = df_achievelike.dropna(subset=['DateReadUtc'])
+        
+        df_achievelike['DateReadUtc'] = pd.to_datetime(df_achievelike['DateReadUtc'])    
+        
+        df_temp = filter_time_tables(TIME_HOURS,df_filter,df_achievelike, 'thread', 'DateReadUtc')
+        
+        df_temp = df_temp.rename(columns={'Id_y':'Id'})
+        
+        df_temp = df_temp.groupby(['Id']).size().reset_index(name='Number of Achievement Likes')
+        
+        df = pd.merge(df_merge_feats,df_temp,on='Id',how = 'left')
+        
+        return(df)
+    
+    
+    
+def feature_engineering_consumption_first_days(time_hours, df_cons, df_filter,df_merge_feats):
+
+    #We use this variable to get the last 7 days
+    df_merge_cons = pd.merge(df_cons,df_filter,left_on='Participation',right_on='Id',how = 'left')
+    
+    df_merge_cons = df_merge_cons[~df_merge_cons.Id_y.isna()]
+
+    df_merge_cons['DateSaved'] = pd.to_datetime(df_merge_cons['DateSaved'])
+    
+    df_merge_cons['Diff'] = df_merge_cons['DateSaved'] - df_merge_cons['StartDateOfParticipation']
+    
+    df = df_merge_cons[['Participation','DateOfRegistration','DateSaved','NumberOfUnitsConsumed','StartDateOfParticipation','Diff']]
+    
+    df = convert_dttime_to_hours(df,'Diff','Total time')
+    
+    df = df[df['Total time']<time_hours]
+    
+    df_temp = df.groupby(['Participation']).agg({'NumberOfUnitsConsumed':['sum']})#.unstack()
+
+    df_frame = pd.DataFrame(columns = ['Id','Total_interval_consumption'])
+    df_frame['Id'] = df_temp.index
+    df_frame['Total_interval_consumption'] = df_temp.values
+    
+    df_temp  = pd.merge(df_merge_feats,df_frame,on = 'Id',how='left')
+    return (df_temp)
+

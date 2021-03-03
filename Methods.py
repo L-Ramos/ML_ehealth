@@ -53,6 +53,25 @@ import sklearn
 
 import hyperparameters as hp
 
+def find_optimal_cutoff(target, predicted):
+    """ Find the optimal probability cutoff point for a classification model related to event rate
+    Parameters
+    ----------
+    target : Matrix with dependent or target data, where rows are observations
+
+    predicted : Matrix with predicted data, where rows are observations
+
+    Returns
+    -------     
+    list type, with optimal cutoff value
+        
+    """
+    fpr, tpr, threshold = roc_curve(target, predicted)
+    i = np.arange(len(tpr)) 
+    roc = pd.DataFrame({'tf' : pd.Series(tpr-(1-fpr), index=i), 'threshold' : pd.Series(threshold, index=i)})
+    roc_t = roc.iloc[(roc.tf-0).abs().argsort()[:1]]
+
+    return list(roc_t['threshold']) 
 
 
 class ClassifierPipeline():
@@ -148,9 +167,12 @@ class ClassifierPipeline():
             meas (object class Measures): updated instance
         
         """
+        t = find_optimal_cutoff(y_test,self.probas)[0]
+        self.preds  = self.probas>=t
         precision, recall, _ = precision_recall_curve(y_test,self.probas)
         meas.f1_score[self.iter] = f1_score(y_test, self.preds)
         meas.auc[self.iter] = roc_auc_score(y_test,self.probas)
+        
         
         tn, fp, fn, tp = confusion_matrix(y_test, self.preds).ravel()  
         
@@ -162,6 +184,11 @@ class ClassifierPipeline():
         meas.mcc[self.iter] = (matthews_corrcoef(y_test,self.preds))
         meas.bacc[self.iter] = (balanced_accuracy_score(y_test,self.preds)) 
         
+        meas.fp[self.iter] = fp
+        meas.fn[self.iter] = fn
+        meas.tp[self.iter] = tp
+        meas.tn[self.iter] = tn
+                    
         meas.probas.append(self.probas)
         meas.labels.append(y_test)
         

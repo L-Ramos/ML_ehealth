@@ -12,8 +12,46 @@ import xlwt
 import numpy as np
 import os
 
+def correlation(dataset, threshold,args):
+    col_corr = set() # Set of all the names of deleted columns
+    corr_matrix = dataset.corr()
+    for i in range(len(corr_matrix.columns)):
+        for j in range(i):
+            if (corr_matrix.iloc[i, j] >= threshold) and (corr_matrix.columns[j] not in col_corr):
+                colname = corr_matrix.columns[i] # getting the name of column
+                col_corr.add(colname)
+                if colname in dataset.columns:
+                    del dataset[colname] # deleting the column from the dataset
+    new_mask_cont = [var for var in args['mask_cont'] if var in dataset.columns]              
+    new_mask_cat = [var for var in args['mask_cat'] if var in dataset.columns]
+    new_mask_bin = [var for var in args['mask_bin'] if var in dataset.columns]    
+    args['mask_cont'] = new_mask_cont
+    args['mask_cat'] = new_mask_cat
+    args['mask_bin'] = new_mask_bin
 
-def clean_data(df_temp,args,experiment,drop_afspraak, feats_use=list()):
+    return(dataset,args)
+
+
+
+def get_success_label(df_temp):
+
+    list_goal = ['GoalMonday', 'GoalTuesday', 'GoalWednesday', 'GoalThursday', 'GoalFriday', 'GoalSaturday', 'GoalSunday']
+    list_target = ['MondayTarget', 'TuesdayTarget', 'WednesdayTarget', 'ThursdayTarget', 'FridayTarget', 'SaturdayTarget', 'SundayTarget']
+    list_cons = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    
+    
+    df_temp['GoalMonday'] = df_temp['Monday']<=df_temp['MondayTarget']
+    df_temp['GoalTuesday'] = df_temp['Tuesday']<=df_temp['TuesdayTarget']
+    df_temp['GoalWednesday'] = df_temp['Wednesday']<=df_temp['WednesdayTarget']
+    df_temp['GoalThursday'] = df_temp['Thursday']<=df_temp['ThursdayTarget']
+    df_temp['GoalFriday'] = df_temp['Friday']<=df_temp['FridayTarget']
+    df_temp['GoalSaturday'] = df_temp['Saturday']<=df_temp['SaturdayTarget']
+    df_temp['GoalSunday'] = df_temp['Sunday']<=df_temp['SundayTarget']
+    
+    df_temp['Total_achieved'] = df_temp[list_cons].apply(lambda x: x.count(), axis=1)
+    return(df_temp)
+
+def clean_data(df_temp,args,experiment,drop_afspraak, total_goaldays = 0,min_goalphase = 0, feats_use=list()):
     
     goal_dict = {0: 'Missing', 1: 'Stop', 2: 'Reduce', 3: 'Slowly Stop', 4: 'Slowly Reduce'}
      
@@ -23,12 +61,19 @@ def clean_data(df_temp,args,experiment,drop_afspraak, feats_use=list()):
     if experiment=='exp1':
         X = df_temp
         y = (df_temp['Phase']>1).astype('int32')
-    else:
+    elif experiment=='exp2':
         X1 = df_temp[df_temp['Phase']==2]
         X2 = df_temp[df_temp['Phase']==6]
         frames = [X1,X2]
         X = pd.concat(frames)
         y = (X['Phase']>2).astype('int32').reset_index(drop=True)
+    elif experiment=='exp3':
+        get_success_label(df_temp)
+        X1 = df_temp[df_temp['Phase']==2]
+        X2 = df_temp[df_temp['Phase']>=min_goalphase]        
+        frames = [X1,X2]
+        X = pd.concat(frames)
+        y = ((X['Phase']>2) & (X['Total_achieved']>=total_goaldays)).astype('int32').reset_index(drop=True)
         
     X = X[feats_use]  
     #X['Jouw afspraken'] = X['Jouw afspraken'].fillna(0)
@@ -41,8 +86,13 @@ def clean_data(df_temp,args,experiment,drop_afspraak, feats_use=list()):
        
     scaler = ColumnTransformer([('Program Goal', OneHotEncoder(),args['mask_cat'])], remainder='passthrough')
     #scaler = ColumnTransformer([(goal_dict.values(), OneHotEncoder(),args['mask_cat'])], remainder='passthrough')
-    X = scaler.fit_transform(X)   
-    X = pd.DataFrame(X,columns = scaler.get_feature_names())
+    X = scaler.fit_transform(X) 
+    cols = scaler.get_feature_names()
+    
+    for i,c in enumerate(cols):
+        cols[i] = c.replace('__x0_','-')
+        
+    X = pd.DataFrame(X,columns = cols)
     
     if drop_afspraak:
         cols_todrop = [c for c in X.columns if 'Afsprak' in c or 'afsprak' in c]
