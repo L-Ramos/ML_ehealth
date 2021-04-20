@@ -12,12 +12,13 @@ import xlwt
 import numpy as np
 import os
 
-def correlation(dataset, threshold,args):
+def correlation(dataset, upthreshold,lowthreshold,args):
     col_corr = set() # Set of all the names of deleted columns
     corr_matrix = dataset.corr()
     for i in range(len(corr_matrix.columns)):
         for j in range(i):
-            if (corr_matrix.iloc[i, j] >= threshold) and (corr_matrix.columns[j] not in col_corr):
+            #if (corr_matrix.iloc[i, j] >= upthreshold) and (corr_matrix.columns[j] not in col_corr):
+            if ((corr_matrix.iloc[i, j] >= upthreshold) or (corr_matrix.iloc[i, j] <= lowthreshold)) and (corr_matrix.columns[j] not in col_corr):
                 colname = corr_matrix.columns[i] # getting the name of column
                 col_corr.add(colname)
                 if colname in dataset.columns:
@@ -31,7 +32,22 @@ def correlation(dataset, threshold,args):
 
     return(dataset,args)
 
-
+def fix_goal_variables(X,y,program):     
+    if program=='Alcohol':
+        X['y'] = y
+        X = X[X['Program Goal-Missing']!=1]
+        X = X.reset_index(drop=True)
+        y = X['y']
+        X = X.drop(['y'],axis=1)
+        X = X.drop(['Program Goal-Missing'],axis=1)
+    elif program=='Smoking':
+        X['y'] = y
+        X = X[X['Program Goal-Reduce']!=1]
+        X = X.reset_index(drop=True)
+        y = X['y']
+        X = X.drop(['y'],axis=1)
+        X = X.drop(['Program Goal-Reduce'],axis=1)
+    return(X,y)
 
 def get_success_label(df_temp):
 
@@ -51,7 +67,7 @@ def get_success_label(df_temp):
     df_temp['Total_achieved'] = df_temp[list_cons].apply(lambda x: x.count(), axis=1)
     return(df_temp)
 
-def clean_data(df_temp,args,experiment,drop_afspraak, total_goaldays = 0,min_goalphase = 0, feats_use=list()):
+def clean_data(df_temp,args,experiment,drop_afspraak,program, total_goaldays = 0,min_goalphase = 0, feats_use=list()):
     
     goal_dict = {0: 'Missing', 1: 'Stop', 2: 'Reduce', 3: 'Slowly Stop', 4: 'Slowly Reduce'}
      
@@ -98,6 +114,11 @@ def clean_data(df_temp,args,experiment,drop_afspraak, total_goaldays = 0,min_goa
         cols_todrop = [c for c in X.columns if 'Afsprak' in c or 'afsprak' in c]
         X = X.drop(cols_todrop,axis=1)
         args['mask_cont'] = [c for c in args['mask_cont'] if 'Afsprak' not in c and 'afsprak' not in c]
+    if program == 'Smoking':
+        cols_todrop = [c for c in X.columns if 'Target' in c]
+        X = X.drop(cols_todrop,axis=1)
+        args['mask_cont'] = [c for c in args['mask_cont'] if 'Target' not in c]
+        
     return(X,y)
 
 
@@ -149,8 +170,8 @@ def table_one(path_write,X,y,args,time_hours):
     sheet1.write(0,2,"Alcohol Other Phases")
         
     for i,col in enumerate(cont_cols):
-        sheet1.write(i+1,1,str("%0.0f (%0.2f)"%(np.mean(df_phase1[col]),np.std(df_phase1[col]))))         
-        sheet1.write(i+1,2,str("%0.0f (%0.2f)"%(np.mean(df_other[col]),np.std(df_other[col]))))
+        sheet1.write(i+1,1,str("%0.0f (%0.0f - %0.0f)"%(np.median(df_phase1[col]),np.nanpercentile(df_phase1[col], 25,interpolation = 'midpoint'),np.nanpercentile(df_phase1[col], 75,interpolation = 'midpoint'))))         
+        sheet1.write(i+1,2,str("%0.0f (%0.0f - %0.0f)"%(np.median(df_other[col]),np.nanpercentile(df_other[col], 25,interpolation = 'midpoint'),np.nanpercentile(df_other[col], 75,interpolation = 'midpoint'))))
         
     for col in (bin_cols):
         i = i + 1

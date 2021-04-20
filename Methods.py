@@ -167,13 +167,12 @@ class ClassifierPipeline():
             meas (object class Measures): updated instance
         
         """
-        t = find_optimal_cutoff(y_test,self.probas)[0]
-        self.preds  = self.probas>=t
+        # t = find_optimal_cutoff(y_test,self.probas)[0]
+        # self.preds  = self.probas>=t
         precision, recall, _ = precision_recall_curve(y_test,self.probas)
         meas.f1_score[self.iter] = f1_score(y_test, self.preds)
         meas.auc[self.iter] = roc_auc_score(y_test,self.probas)
-        
-        
+                
         tn, fp, fn, tp = confusion_matrix(y_test, self.preds).ravel()  
         
         meas.sens[self.iter] = tp/(tp+fn)
@@ -222,7 +221,7 @@ class InitPipeline(ClassifierPipeline):
         self.pipe = self.def_pipeline()
         self.preds,self.probas, self.grid_result = self.run_grid_search(x_train,y_train,x_test,y_test)  
         #For now, SHAP only for RF and XGB
-        if type(self.clf)==sklearn.ensemble._forest.RandomForestClassifier:
+        if type(self.clf)==sklearn.ensemble._forest.RandomForestClassifier or type(self.clf)==xgb.sklearn.XGBClassifier:
             meas = self.shap_visualization(x_test,x_train,meas,test_index)                
             
         meas, self.evaluation_measures(y_test,meas)
@@ -295,9 +294,9 @@ class XGBoost_CLF(InitPipeline):
     
     def define_classifier(self):
         if self.und=='W':
-            clf = xgb.XGBClassifier(random_state=self.random_state,scale_pos_weight=self.pos_weight) 
+            clf = xgb.XGBClassifier(random_state=self.random_state,scale_pos_weight= self.pos_weights) 
         else:                                    
-            clf = xgb.XGBClassifier(random_state=random_state)            
+            clf = xgb.XGBClassifier(random_state=self.random_state)            
         return(clf)
     
     def __init__ (self,args,x_train,y_train,x_test,y_test,meas,test_index):
@@ -373,7 +372,7 @@ def print_results_excel(m,names,path_results):
     #plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')          
    
     
-def plot_shap(X,args, path_results,feat_names):
+def plot_shap(X,args, path_results,feat_names,var_list):
              
    
     file = os.path.join(path_results,"measures_RFC.pkl")
@@ -399,6 +398,12 @@ def plot_shap(X,args, path_results,feat_names):
 
     #shap_values = np.where(np.abs(shap_values)>5, 0, shap_values)
     test_set = pd.DataFrame(test_set,columns=feat_names)
+    
+    for var in test_set.columns:
+        new_name = list(var_list[var_list.Feature==var]['Final_name'])
+        if len(new_name)>0:
+            test_set = test_set.rename(columns={var: new_name[0]})
+
 
     shap.summary_plot(shap_values, test_set, plot_type="bar",show=False,plot_size=(20,10))
     f = plt.gcf()

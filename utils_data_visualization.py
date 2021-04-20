@@ -550,10 +550,24 @@ def feature_engineering_consumption_first_days(time_hours, df_cons, df_filter,df
     
     df_temp = df.groupby(['Participation']).agg({'NumberOfUnitsConsumed':['sum']})#.unstack()
 
-    df_frame = pd.DataFrame(columns = ['Id','Total_interval_consumption'])
+    df_frame = pd.DataFrame(columns = ['Id','Total interval consumption'])
     df_frame['Id'] = df_temp.index
-    df_frame['Total_interval_consumption'] = df_temp.values
+    df_frame['Total interval consumption'] = df_temp.values
     
     df_temp  = pd.merge(df_merge_feats,df_frame,on = 'Id',how='left')
     return (df_temp)
 
+def feature_engineering_diaryrecord(time_hours,df_filter,df_diary,df_merge_feats):
+
+    df_temp = filter_time_tables(time_hours, df_filter, df_diary,'assignment','DateCreated')
+
+    ids_match = match_ids(df_filter,'Id', df_diary,'Participation')
+
+    df_temp = df_temp[df_temp.Participation.isin(ids_match)]
+    df_temp['Content Length'] = df_temp['Content'].str.len()    
+
+    df_feats = df_temp.groupby(['Participation']).size().reset_index(name='Diary Entries')  
+
+    df_temp = pd.merge(df_merge_feats,df_feats,left_on = 'Id', right_on='Participation',how = 'left')
+
+    return(df_temp)

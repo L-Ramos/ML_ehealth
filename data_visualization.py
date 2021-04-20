@@ -55,6 +55,8 @@ df_partbadge = uts.load_data(PATH_DATA,"ParticipationBadge.xls")
 
 df_achievelike = uts.load_data(PATH_DATA,"AchievementLike.xls")
 
+df_diary = uts.load_data(PATH_DATA,"DiaryRecord.csv")
+
 df_program, df_participator, df_phasestart, df_events, df_forumpost, df_forumthread, df_thread = uts.fix_frames(df_program, df_participator, df_phasestart, df_events, df_forumpost,
                                                                                      df_forumthread, df_thread)
 
@@ -76,6 +78,7 @@ df_events = uts.filter_date(df_events,'DateOfEvent')
 df_forumpost = uts.filter_date(df_forumpost,'DateCreated')
 df_forumthread = uts.filter_date(df_forumthread,'DateCreated')
 df_thread = uts.filter_date(df_thread, 'Date')
+df_diary = uts.filter_date(df_diary, 'DateCreated')
 
 print('Tables filtered by Date.')
 
@@ -113,7 +116,7 @@ print("Tables merged.")
 program_dict = {1: 'Alcohol',2: 'Cannabis', 5: 'Smoking'}
 pros_cons_dic = {3:'Pros Short', 4: 'Pros Long', 5: 'Cons Short', 6: 'Cons Long'} 
 
-TIME_HOURS_LIST = [72,96,120]
+TIME_HOURS_LIST = [48,72,96]
 
 number_of_days_cons = 7
 
@@ -152,14 +155,16 @@ for PROGRAM in program_dict.keys():
         #df_merge_feats = uts.remove_ids_future_edits(df_merge_challenge,df_filter,df_merge_feats,TIME_HOURS)
         
         df_merge_feats = uts.add_consumption_before_last_phase(number_of_days_cons,df_cons,df_phasestart, df_merge_feats)
-        
-        df_merge_feats = uts.feature_engineering_consumption_first_days(time_hours, df_cons, df_filter,df_merge_feats)
+                
+        df_merge_feats = uts.feature_engineering_consumption_first_days(TIME_HOURS, df_cons, df_filter,df_merge_feats)
         
         df_merge_feats = uts.feature_engineering_thread_vieweing(TIME_HOURS,df_thread,df_filter,df_merge_feats)
         
         df_merge_feats = uts.feature_engineering_badge(TIME_HOURS,df_filter,df_partbadge,df_merge_feats)
         
         df_merge_feats = uts.feature_engineering_achievementlike(TIME_HOURS,df_filter,df_achievelike,df_merge_feats)
+        
+        df_merge_feats = uts.feature_engineering_diaryrecord(TIME_HOURS,df_filter,df_diary,df_merge_feats)
         
         #Saves it as a .csv file
         uts.save_frame(df_merge_feats,os.path.join(PATH_SAVE,program_dict[PROGRAM]+str(TIME_HOURS)+'.csv'))
@@ -173,7 +178,32 @@ for PROGRAM in program_dict.keys():
 
 #%%
 
-print((203*100)/9709)
+ #We use this variable to get the last 7 days
+df_merge_cons = pd.merge(df_cons,df_filter,left_on='Participation',right_on='Id',how = 'left')
+
+df_merge_cons = df_merge_cons[~df_merge_cons.Id_y.isna()]
+
+df_merge_cons['DateSaved'] = pd.to_datetime(df_merge_cons['DateSaved'])
+
+df_merge_cons['Diff'] = df_merge_cons['DateSaved'] - df_merge_cons['StartDateOfParticipation']
+
+df = df_merge_cons[['Participation','DateOfRegistration','DateSaved','NumberOfUnitsConsumed','StartDateOfParticipation','Diff']]
+
+df = uts.convert_dttime_to_hours(df,'Diff','Total time')
+
+df = df[df['Total time']<time_hours]
+
+df_temp = df.groupby(['Participation']).agg({'NumberOfUnitsConsumed':['sum']})#.unstack()
+
+df_frame = pd.DataFrame(columns = ['Id','Total interval consumption'])
+df_frame['Id'] = df_temp.index
+df_frame['Total_interval_consumption'] = df_temp.values
+
+df_temp  = pd.merge(df_merge_feats,df_frame,on = 'Id',how='left')
+
+
+
+#df_feats['Total Agreement Length'] = df_temp.groupby(['Participation']).agg({'Content Length':['sum']})['Content Length']['sum'].values
 
 
 #%%This is for df_achievelike
@@ -343,21 +373,11 @@ df_plot.set_index('Date').plot.bar(fontsize='12')
 #%% vor checking and visualizing the data since somes frames are huge
 #df_merge[df_merge.Participation==14744]
 
-df = pd.read_csv(r"\\amc.intra\users\L\laramos\home\Desktop\Postdoc eHealth\feature_datasets\Alcohol72.csv")
-df2 = pd.read_csv(r"\\amc.intra\users\L\laramos\home\Desktop\Postdoc eHealth\feature_datasets\Alcoholinf.csv")
+df = df_program[df_program['Program']==1]
 
-ids = df_merge_reg.Participation.iloc[0]
+df.GoalOfProgram.value_counts()
 
-df_vis = df_merge_reg[df_merge_reg['Participation']==ids]
-
-df_merge = df_merge[df_merge['Finished']==1]
-df_merge.Id.nunique()
-
-df_vis = df_merge_events.head(10)
-
-
-df_merge.Id.nunique()
-
+df1 = df[df.GoalOfProgram.isna()]
 
 
 #checking the overlap
@@ -513,3 +533,116 @@ sns.heatmap(corr, mask=mask, cmap=cmap, vmax=1.0, center=0,
             square=True, linewidths=.5, cbar_kws={"shrink": .5},annot = True,fmt='.1g')
 
 
+#%% This is for plotting the number of participants over the time
+
+import os
+import matplotlib.pyplot as plt
+
+def plot_figure(res):
+        list_vals = list()
+    for i in range(1,10):
+        y = (res>=i)
+        list_vals.append(sum(y))
+        print(sum(y))
+    
+    #list_vals.append(0)
+    fig = plt.figure(figsize=(7, 5))
+    ax = fig.add_subplot(111)
+    
+    ax.set_ylim(0, max(list_vals))
+     
+    ax.set_title(name)
+    ax.set_xlabel("Days")
+    ax.set_ylabel("Participants")  
+
+
+#name = "Alcohol"
+#name = "Cannabis"
+name = "Smoking"
+df = pd.read_csv(os.path.join(r"\\amc.intra\users\L\laramos\home\Desktop\Postdoc eHealth\feature_datasets",name+"72.csv"))
+
+df1 = df_merge_part[['Id_y','Participator']]
+
+df_merge = pd.merge(df,df1,left_on='Id',right_on='Id_y')
+
+df_merge = df_merge.rename(columns = {'Id_y': 'ID'})
+
+#df_events['EventGenerator'] = pd.to_numeric(df_events['EventGenerator'], errors='coerce').astype(pd.Int64Dtype())
+#df_merge['Participator'] = pd.to_numeric(df_merge['Participator'], errors='coerce').astype(pd.Int64Dtype())
+
+df_events['DateOfEvent'] = pd.to_datetime(df_events['DateOfEvent'])
+df_merge['StartDateOfParticipation'] = pd.to_datetime(df_merge['StartDateOfParticipation'])
+
+
+df_merge2 = uts.merge_multactivity_program(df_events,df_merge, 'DateOfEvent','StartDateOfParticipation','EventGenerator','Participator')
+
+df_mergef = pd.merge(df_merge2,df,left_on='ID',right_on='Id',how='inner')
+
+res = df_mergef.groupby('ID')['DateOfEvent'].nunique()
+
+plot_figure(res)
+
+#%%  this is for plotting ghe registry of drinking over time
+
+import os
+
+def plot_comsumption(res,days):
+    list_vals = list()
+    for i in range(1,days):
+        y = (res>=i)
+        list_vals.append(sum(y))
+        print(sum(y))
+    
+    #list_vals.append(0)
+    fig = plt.figure(figsize=(7, 5))
+    ax = fig.add_subplot(111)
+    
+    ax.set_ylim(0, max(list_vals))
+    ax.set_xlim(1, days)
+    ax.xaxis.set_ticks(np.arange(1, days-1, 1))
+    
+    ax.set_title(name)
+    ax.set_xlabel("Days")
+    ax.set_ylabel("Participants") 
+    ax.plot(list_vals)
+
+name = "Alcohol"
+#name = "Cannabis"
+#name = "Smoking"
+df = pd.read_csv(os.path.join(r"\\amc.intra\users\L\laramos\home\Desktop\Postdoc eHealth\feature_datasets",name+"72.csv"))
+
+df1 = df_cons[['Participation','DateOfRegistration','NumberOfUnitsConsumed']]
+
+df_merge = pd.merge(df,df1,left_on='Id',right_on='Participation')
+
+df_merge['StartDateOfParticipation'] = pd.to_datetime(df_merge['StartDateOfParticipation'])
+df_merge['DateOfRegistration'] = pd.to_datetime(df_merge['DateOfRegistration'])
+
+res = df_merge.groupby('Id')['DateOfRegistration'].nunique()
+
+plot_comsumption(res,12)
+
+#%%
+# difference for the consecutive days
+df_merge = df_merge.sort_values('DateOfRegistration', ascending=0)
+
+df_merge['diff_col'] = df_merge.sort_values(['Id','DateOfRegistration','StartDateOfParticipation']).groupby('Id')['DateOfRegistration'].diff()
+df_merge = df_merge[['Id','StartDateOfParticipation','DateOfRegistration','NumberOfUnitsConsumed','diff_col']]
+
+#remove days that have alrge intervals
+df2 = df_merge[df_merge['diff_col'].dt.days<=1]
+
+
+res = df2.groupby('Id')['DateOfRegistration'].nunique()
+
+plot_comsumption(res,30)
+
+
+df3 = df_merge[df_merge.diff_col.isna()]
+df3['diff_col'] = df3['DateOfRegistration'] - df3['StartDateOfParticipation']
+
+df3 = df3[df3['diff_col'].dt.days>1]
+
+df4 = df_merge[df_merge['Id']== 14763]
+
+df5 = df_merge.head(1000)
