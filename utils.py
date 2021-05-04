@@ -51,6 +51,7 @@ class Measures:
         self.labels = list()
         self.shap_values = list()
         self.test_sets = list()
+        self.best_params = list()
 
 
 def Save_fpr_tpr(path_results,names,measures):

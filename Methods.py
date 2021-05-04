@@ -142,8 +142,9 @@ class ClassifierPipeline():
         """ Performs SHAP visualization for the Random Forest Classifier. """    
         explainer = shap.TreeExplainer(self.grid_result.best_estimator_['clf'])   
         scaler =  self.grid_result.estimator['scaler'].fit(x_train)     
+        meas.best_params.append(self.grid_result.best_params_)
         x_test_shap = scaler.transform(x_test)
-        shap_values = explainer.shap_values(x_test_shap)
+        shap_values = explainer.shap_values(x_test_shap)      
         meas.shap_values.append(shap_values)
         meas.test_sets.append(x_test_shap)
         new_col_order = self.mask_cont
@@ -372,10 +373,10 @@ def print_results_excel(m,names,path_results):
     #plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')          
    
     
-def plot_shap(X,args, path_results,feat_names,var_list):
+def plot_shap(X,args, path_results,feat_names,var_list,name):
              
    
-    file = os.path.join(path_results,"measures_RFC.pkl")
+    file = os.path.join(path_results,"measures_"+name+".pkl")
     
     with open(file, 'rb') as f:
         meas = pickle.load(f)
@@ -423,7 +424,55 @@ def plot_shap(X,args, path_results,feat_names,var_list):
     #plt.savefig(os.path.join(folder,type_var+'dist.tiff'))
 
 
+def plot_shap_xgb(X,args, path_results,feat_names,var_list,name):
+             
+   
+    file = os.path.join(path_results,"measures_"+name+".pkl")
+    
+    with open(file, 'rb') as f:
+        meas = pickle.load(f)
+    
+   
+    shap_values = meas.shap_values[0]
+    for i in range(1,len(meas.shap_values)):
+        shap_values  = np.concatenate((shap_values,meas.shap_values[i]),axis=0)
+        
+    # names = pd.read_csv(os.path.join(path,"columns_used.csv"))
+    # shap_values = lr_m.shap_values[0][1]
+    # for i in range(1,len(lr_m.shap_values)):
+    #     shap_values  = np.concatenate((shap_values,lr_m.shap_values[i][1]),axis=0)        
+        
+    test_set = meas.test_sets[0]
+    for i in range(1,len(meas.test_sets)):        
+        test_set  = np.concatenate((test_set,meas.test_sets[i]), axis=0)
+        
+    #test_set = X.iloc[test_index,:]     
 
+    #shap_values = np.where(np.abs(shap_values)>5, 0, shap_values)
+    test_set = pd.DataFrame(test_set,columns=feat_names)
+    
+    for var in test_set.columns:
+        new_name = list(var_list[var_list.Feature==var]['Final_name'])
+        if len(new_name)>0:
+            test_set = test_set.rename(columns={var: new_name[0]})
+
+
+    shap.summary_plot(shap_values, test_set, plot_type="bar",show=False,plot_size=(20,10))
+    f = plt.gcf()
+    plt.tight_layout()
+    plt.savefig(os.path.join(path_results,name+'bar.pdf'))
+    f.clear()
+    plt.close(f)
+    #plt.savefig(os.path.join(folder,type_var+'bar.tiff'))
+
+
+    shap.summary_plot(shap_values, test_set,show=False,plot_size=(20,10))
+    f = plt.gcf()
+    plt.tight_layout()
+    plt.savefig(os.path.join(path_results,name+'dist.pdf'))
+    f.clear()
+    plt.close(f)
+    #plt.savefig(os.path.join(folder,type_var+'dist.tiff'))
 
 
 

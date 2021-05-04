@@ -5,8 +5,7 @@ Created on Wed Nov 25 16:08:45 2020
 @author: laramos
 """
 
-from sklearn.datasets import load_breast_cancer
-from sklearn.model_selection import KFold
+
 from sklearn.model_selection import StratifiedKFold
 
 import pandas as pd
@@ -46,9 +45,9 @@ upthresh_corr = 0.8
 lowthresh_corr = -10
 #upthresh_corr = 0.99
 #lowthresh_corr = -0.99
-#min_goalphase = [4,5,6]
-min_goalphase = [6]
-min_goaldays = 7
+min_goalphase = [4,5,6]
+#min_goalphase = [6]
+min_goaldays = 6
 
 max_date = '2020-10-12'
 
@@ -85,17 +84,19 @@ for goal_phase in min_goalphase:
                     X_test,y_test = X.iloc[test_index,:], y[test_index]
                     args['current_iteration'] = fold
                     args['pos_weights'] = (y_train.shape[0]-sum(y_train))/sum(y_train)
-                    #grid_rfc = mt.RandomForest_CLF(args,X_train,y_train,X_test,y_test,rfc_m,test_index)
-                    grid_rfc = mt.XGBoost_CLF(args,X_train,y_train,X_test,y_test,rfc_m,test_index)
-                    #grid_lr = mt.LogisticRegression_CLF(args,X_train,y_train,X_test,y_test,lr_m,test_index)
+                    grid_rfc = mt.RandomForest_CLF(args,X_train,y_train,X_test,y_test,rfc_m,test_index)
+                    #grid_xgb = mt.XGBoost_CLF(args,X_train,y_train,X_test,y_test,xgb_m,test_index)
+                    grid_lr = mt.LogisticRegression_CLF(args,X_train,y_train,X_test,y_test,lr_m,test_index)
                 
                 
-                # names = ['RFC']
-                # meas = [rfc_m]
-                names = ['LR','RFC']
-                meas = [lr_m,rfc_m]
+                
+                #names = ['RFC','LR','XGB']
+                #meas = [rfc_m,lr_m,xgb_m]                            
+                names = ['RFC','LR']
+                meas = [rfc_m,lr_m]                            
                 mt.print_results_excel(meas,names,path_write)
-                mt.plot_shap(X,args,path_write, rfc_m.feat_names,var_list)
+                mt.plot_shap(X,args,path_write, rfc_m.feat_names,var_list,names[0])
+                #mt.plot_shap_xgb(X,args,path_write, xgb_m.feat_names,var_list,names[2])
                 
                 print("Auc: %0.2f, Sens: %0.2f, Spec: %0.2f, PPV: %0.2f, NPV: %0.2f"%(rfc_m.auc[1],rfc_m.sens[1],rfc_m.spec[1],rfc_m.ppv[1],rfc_m.npv[1]))
       
@@ -218,6 +219,32 @@ iqr(x,rng=(25,75))
 
 np.nanpercentile(x, 25),
 np.nanpercentile(x, 75)
+#%% getting the hyper-parameters chosen
 
+import pickle
+import os
+import seaborn as sns
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+     
+program = 'Alcohol'
+#program = 'Cannabis'
+#program = 'Smoking'
+
+path = os.path.join(r"\\amc.intra\users\L\laramos\home\Desktop\Postdoc eHealth\Results",program+"72_safe_min_days_6_min_phase_6exp3\measures_RFC.pkl")
+
+with open(path, 'rb') as f:
+    meas = pickle.load(f)
+    
+#var = 'clf__min_samples_split'
+#var = 'clf__n_estimators'
+#var = 'clf__min_samples_leaf'
+var = 'clf__max_features'
+#var = 'clf__max_depth'
+#var = 'clf__criterion'
+    
+for vals in meas.best_params:
+    print(vals[var])    
 
 

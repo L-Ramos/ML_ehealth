@@ -620,7 +620,7 @@ df_merge['DateOfRegistration'] = pd.to_datetime(df_merge['DateOfRegistration'])
 
 res = df_merge.groupby('Id')['DateOfRegistration'].nunique()
 
-plot_comsumption(res,12)
+plot_comsumption(res,30)
 
 #%%
 # difference for the consecutive days

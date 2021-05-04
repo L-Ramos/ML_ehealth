@@ -19,22 +19,23 @@ feature_type = 'safe'
 experiment = 'exp3'
 drop_afspraak = False
 thresh_corr = 0.8
-goal_phase = 6
+all_goal_phase = [4,5,6]
 #min_goalphase = [6]
 min_goaldays = 7
 time_hours = 72
 
-for i,program in enumerate(program_list):
-    path_read = os.path.join(PATH_RESULTS,program+str(time_hours)+"_"+feature_type+"_min_days_"+str(min_goaldays)+"_min_phase_"+str(goal_phase)+experiment)
-    df = pd.read_excel(os.path.join(path_read,'results.xls'))
-    df['Program'] = program
-    if i==0:
-        df_merge = df
-    else:
-        df_merge = pd.concat([df_merge,df])
+for goal_phase in all_goal_phase:
+    for i,program in enumerate(program_list):
+        path_read = os.path.join(PATH_RESULTS,program+str(time_hours)+"_"+feature_type+"_min_days_"+str(min_goaldays)+"_min_phase_"+str(goal_phase)+experiment)
+        df = pd.read_excel(os.path.join(path_read,'results.xls'))
+        df['Program'] = program
+        if i==0:
+            df_merge = df
+        else:
+            df_merge = pd.concat([df_merge,df])
         
-df_merge = df_merge[['Program','Methods', 'AUC 95% CI ', 'F1-Score', 'Sensitivity', 'Specificity','PPV', 'NPV']]
-df_merge.to_excel(os.path.join(PATH_RESULTS,str(time_hours)+"_"+feature_type+"_min_days_"+str(min_goaldays)+"_min_phase_"+str(goal_phase)+experiment+'merged.xls'))
+    df_merge = df_merge[['Program','Methods', 'AUC 95% CI ', 'F1-Score', 'Sensitivity', 'Specificity','PPV', 'NPV']]
+    df_merge.to_excel(os.path.join(PATH_RESULTS,str(time_hours)+"_"+feature_type+"_min_days_"+str(min_goaldays)+"_min_phase_"+str(goal_phase)+experiment+'merged.xls'))
 
 
 #%% this is for checking the Pr curve for the results
