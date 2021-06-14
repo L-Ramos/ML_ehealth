@@ -34,7 +34,7 @@ PATH_DATA = r"\\amc.intra\users\L\laramos\home\Desktop\Postdoc eHealth\feature_d
 # feature_type_list = ['safe','all']
 #time_hours_list = [72]
 
-#time_hours_list = [48,72,96]
+#time_hours_list = [48,96]
 time_hours_list = [72]
 program_list = ['Alcohol','Cannabis', 'Smoking']
 #program_list = ['Smoking']
@@ -45,9 +45,9 @@ upthresh_corr = 0.8
 lowthresh_corr = -10
 #upthresh_corr = 0.99
 #lowthresh_corr = -0.99
-min_goalphase = [4,5,6]
-#min_goalphase = [6]
-min_goaldays = 6
+#min_goalphase = [4,5,6]
+min_goalphase = [6]
+min_goaldays = 7
 
 max_date = '2020-10-12'
 
@@ -57,7 +57,7 @@ for goal_phase in min_goalphase:
             for feature_type in feature_type_list:
                 print('')
             
-                path_write = os.path.join(PATH_RESULTS,program+str(time_hours)+"_"+feature_type+"_min_days_"+str(min_goaldays)+"_min_phase_"+str(goal_phase)+experiment)
+                path_write = os.path.join(PATH_RESULTS,program+str(time_hours)+"_"+feature_type+"_min_days_"+str(min_goaldays)+"_min_phase"+str(goal_phase)+experiment)
         
                 if not os.path.exists(path_write):
                     os.mkdir(path_write)
@@ -72,10 +72,11 @@ for goal_phase in min_goalphase:
                 X, y = dt.fix_goal_variables(X,y,program)                
                 
                 dt.table_one(path_write,X,y,args,time_hours)  
-                
+
                 X,args = dt.correlation(X,upthresh_corr,lowthresh_corr,args)                 
                 
                 kf = StratifiedKFold(n_splits = args['outter_splits'], random_state=1, shuffle=True)
+ 
                 
                 rfc_m, lr_m, xgb_m, _, _ = ut.create_measures(args['outter_splits'])
                 
@@ -122,11 +123,13 @@ with open(path, 'rb') as f:
     
 
 array = [[np.sum(meas.tp),np.sum(meas.fp)],[np.sum(meas.fn),np.sum(meas.tn)]]
-df_cm = pd.DataFrame(array, index = [i for i in ["Successful","Unsuccessful"]],
-                  columns = [i for i in ["Successful","Unsuccessful"]])
+df_cm = pd.DataFrame(array, index = [i for i in ["Successful","Early Dropout"]],
+                  columns = [i for i in ["Successful","Early Dropout"]])
 plt.figure(figsize = (11,8))
 sns.set(font_scale=2.0)
 plot = sns.heatmap(df_cm, annot=True,fmt = ".1f",cmap="Blues")   
+if program=='Smoking':
+    program = 'Tobacco'
 plot.set_title(str("Confusion matrix: "+program))
 
 h,_ = os.path.split(path)

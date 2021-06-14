@@ -168,8 +168,8 @@ class ClassifierPipeline():
             meas (object class Measures): updated instance
         
         """
-        # t = find_optimal_cutoff(y_test,self.probas)[0]
-        # self.preds  = self.probas>=t
+        #t = find_optimal_cutoff(y_test,self.probas)[0]
+        #self.preds  = self.probas>=t
         precision, recall, _ = precision_recall_curve(y_test,self.probas)
         meas.f1_score[self.iter] = f1_score(y_test, self.preds)
         meas.auc[self.iter] = roc_auc_score(y_test,self.probas)

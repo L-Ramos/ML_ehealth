@@ -84,12 +84,23 @@ def clean_data(df_temp,args,experiment,drop_afspraak,program, total_goaldays = 0
         X = pd.concat(frames)
         y = (X['Phase']>2).astype('int32').reset_index(drop=True)
     elif experiment=='exp3':
-        get_success_label(df_temp)
-        X1 = df_temp[df_temp['Phase']==2]
+        df_temp = get_success_label(df_temp)
+        X1 = df_temp[df_temp['Phase']==2]        
         X2 = df_temp[df_temp['Phase']>=min_goalphase]        
         frames = [X1,X2]
         X = pd.concat(frames)
-        y = ((X['Phase']>2) & (X['Total_achieved']>=total_goaldays)).astype('int32').reset_index(drop=True)
+       
+        #>2 because there only 2 values here, 2 and min_goalphase        
+        y = ((X['Phase']>2) & (X['Total_achieved']>=total_goaldays)).astype('int32')#.reset_index(drop=True)
+        X['y'] = y
+        X['drop'] = ((X['Phase']>=min_goalphase) & (X['y']==0))
+        X = X[X['drop']==False]
+        y = X['y'].reset_index(drop=True)
+        
+    elif experiment=='exp4':
+        df_temp = get_success_label(df_temp)        
+        X = df_temp[df_temp['Phase']>=min_goalphase]        
+        y = ((X['Total_achieved']>=total_goaldays)).astype('int32').reset_index(drop=True)
         
     X = X[feats_use]  
     #X['Jouw afspraken'] = X['Jouw afspraken'].fillna(0)
