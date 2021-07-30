@@ -26,7 +26,7 @@ def get_success_label(df_temp):
     return(df_temp)
 
 max_date = '2020-10-12'
-df = pd.read_csv(r"\\amc.intra\users\L\laramos\home\Desktop\Postdoc eHealth\feature_datasets\Alcohol72.csv")
+df = pd.read_csv(r"\\amc.intra\users\L\laramos\home\Desktop\Postdoc eHealth\feature_datasets\Cannabis72.csv")
 df = df[df.StartDateOfParticipation<max_date]
 tot = df.shape[0]
 df = get_success_label(df)
@@ -40,33 +40,15 @@ for phase in range(0,7):
 #decrease reach per fase
 for phase in range(1,7):
     print(df[df.Phase>=phase].shape[0],(df[df.Phase>=phase].shape[0]*100)/tot)
-
+    
+    
 print("\n")
 for phase in range(0,8):    
     print(df[df['Total_achieved']>=phase].shape[0],(df[df['Total_achieved']>=phase].shape[0]*100)/tot)
     
-    
-    
-# df['y1'] = df.Phase==6
-
-# df['y2'] = df['Total_achieved']>=7
-
-# df['y3'] = df['y1'] & df['y2']   
-
-# print(sum(df.y3)) 
-
-# df['GoalOfProgram'] =df['GoalOfProgram'].map(goal_dict) 
-       
-# scaler = ColumnTransformer([('Program Goal', OneHotEncoder(),args['mask_cat'])], remainder='passthrough')
-# #scaler = ColumnTransformer([(goal_dict.values(), OneHotEncoder(),args['mask_cat'])], remainder='passthrough')
-# df = scaler.fit_transform(df) 
-# cols = scaler.get_feature_names()
 
 
-# for i,c in enumerate(cols):
-#     cols[i] = c.replace('__x0_','-')
-# X = pd.DataFrame(df,columns = cols)
-    
+df = df[df.Phase>=6]    
 
+print(df[df['Total_achieved']<7].shape[0],(df[df['Total_achieved']>=phase].shape[0]*100)/tot)
 
-# X = X[X['Program Goal-Missing']!=1]

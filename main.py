@@ -36,8 +36,8 @@ PATH_DATA = r"\\amc.intra\users\L\laramos\home\Desktop\Postdoc eHealth\feature_d
 
 #time_hours_list = [48,96]
 time_hours_list = [72]
-program_list = ['Alcohol','Cannabis', 'Smoking']
-#program_list = ['Smoking']
+#program_list = ['Alcohol','Cannabis', 'Smoking']
+program_list = ['Smoking']
 feature_type_list = ['safe']
 experiment = 'exp3'
 drop_afspraak = False
@@ -76,6 +76,8 @@ for goal_phase in min_goalphase:
                 X,args = dt.correlation(X,upthresh_corr,lowthresh_corr,args)                 
                 
                 kf = StratifiedKFold(n_splits = args['outter_splits'], random_state=1, shuffle=True)
+                
+    
  
                 
                 rfc_m, lr_m, xgb_m, _, _ = ut.create_measures(args['outter_splits'])
@@ -88,6 +90,8 @@ for goal_phase in min_goalphase:
                     grid_rfc = mt.RandomForest_CLF(args,X_train,y_train,X_test,y_test,rfc_m,test_index)
                     #grid_xgb = mt.XGBoost_CLF(args,X_train,y_train,X_test,y_test,xgb_m,test_index)
                     grid_lr = mt.LogisticRegression_CLF(args,X_train,y_train,X_test,y_test,lr_m,test_index)
+                    break
+                break
                 
                 
                 
